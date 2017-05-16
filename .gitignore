@@ -1,0 +1,13 @@
+# Rust
+target/
+**/*.rs.bk
+Cargo.lock
+target/
+**/*.rs.bk
+
+# Sublime
+*.sublime-workspace
+
+# Misc
+*.log
+.vagrant/
