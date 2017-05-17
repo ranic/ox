@@ -8,3 +8,13 @@ pub fn fnv_hash(s: &str) -> u64
   }
   return h;
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_fnv_hash() {
+      assert_eq!(18098019522363481619, fnv_hash("foo"));
+  }
+}
