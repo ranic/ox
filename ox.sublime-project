@@ -7,4 +7,12 @@
       "file_exclude_patterns": ["*.log"],
 		}
 	],
+  "settings": {
+    "file_heading": {
+      "header_file": "lic_header.txt",
+      "variables": {
+        "author": "Akshay Nanavati <https://github.com/akshaynanavati>"
+      }
+    }
+  }
 }
