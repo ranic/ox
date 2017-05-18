@@ -9,7 +9,7 @@ fn main() {
   match io::stdin().read_line(&mut input) {
     Ok(n) => {
         println!("{} bytes read", n);
-        println!("{}", fnv_hash(&input));
+        println!("{}", fnv_hash(&String::from(input)));
     }
     Err(error) => println!("error: {}", error),
   }

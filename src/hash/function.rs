@@ -1,4 +1,4 @@
-pub fn fnv_hash(s: &str) -> u64
+pub fn fnv_hash(s: &String) -> u64
 {
   let mut h: u64 = 2166136261;
 
@@ -15,6 +15,6 @@ mod tests {
 
   #[test]
   fn test_fnv_hash() {
-      assert_eq!(18098019522363481619, fnv_hash("foo"));
+      assert_eq!(18098019522363481619, fnv_hash(&String::from("foo")));
   }
 }
