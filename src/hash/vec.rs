@@ -19,6 +19,8 @@
 use hash::functions;
 
 enum HashEntry<T> {
+  // TODO: Rename index -> ideal_idx. It should be the start of the probe, not where the element
+  // ended up
   Value {key: String, data: T, hash: u64, index: usize},
   Tombstone {index: usize},
   Empty,
@@ -46,8 +48,8 @@ impl <T> Hash<T> {
       match self.table[i] {
         HashEntry::Empty => {return None;}
         HashEntry::Tombstone {..} => (),
-        HashEntry::Value {key: ref target_key, ref data, hash: ref target_hash, ..} => {
-          if hash == *target_hash && key == *target_key {
+        HashEntry::Value {key: ref target_key, ref data, hash: target_hash, ..} => {
+          if hash == target_hash && key == *target_key {
             return Some(data);
           }
         },
@@ -56,12 +58,43 @@ impl <T> Hash<T> {
     return None;
   }
 
+  pub fn grow(&mut self, key: String, value: T) {
+    // Doubles self.table's capacity and adds (key, value) to the new table
+    // Initialize new table
+    let new_cap = self.capacity << 1;
+    let mut new_table = Vec::with_capacity(new_cap);
+    for _ in 0..new_cap {
+      new_table.push(HashEntry::Empty);
+    }
+
+    // Re-hash entries from old table to new table
+    for entry in self.table.drain(..) {
+      match entry {
+        HashEntry::Value {key: target_key, data, hash, ..} => {
+          match find_insert_index(&new_table, new_cap, &key, hash) {
+            Some(i) => {new_table[i] = HashEntry::Value {key: target_key, data, hash, index: i};}
+            None => {panic!("Failed to insert during resize! old_cap: {}, new_cap: {}", self.capacity, new_cap);}
+          }
+        },
+        _ => (),
+      }
+    }
+
+    // Add the supplied (key, value) to new table
+    let hash = hash_func(&key);
+    match find_insert_index(&new_table, new_cap, &key, hash) {
+      Some(i) => {new_table[i] = HashEntry::Value {key: key, data: value, hash, index: i};},
+      None => {panic!("Failed to insert during resize! old_cap: {}, new_cap: {}", self.capacity, new_cap);}
+    }
+    self.capacity = new_cap;
+    self.table = new_table;
+  }
+
   pub fn set(&mut self, key: String, value: T) {
     let hash = hash_func(&key);
-    let initial_i = self.hash_to_index(hash);
-    match self.find_set_index(&key, initial_i) {
+    match find_insert_index(&self.table, self.capacity, &key, hash) {
       Some(i) => {self.table[i] = HashEntry::Value {key, data: value, hash, index: i}; return;}
-      None => panic!("RESIZE ME!")
+      None => {self.grow(key, value);}
     }
   }
 
@@ -95,26 +128,31 @@ impl <T> Hash<T> {
     return None;
   }
 
-  fn find_set_index(&mut self, key: &String, initial_i: usize) -> Option<usize> {
-    for offset in 0..self.capacity {
-      let i = (initial_i + offset) % self.capacity;
+}
 
-      match self.table[i] {
-        HashEntry::Empty => {return Some(i)},
-        HashEntry::Tombstone {index: target_index} => {
-          if i == target_index {
-            return Some(i);
-          }
-        },
-        HashEntry::Value {key: ref target_key, ..} => {
-          if *key == *target_key {
-            return Some(i);
-          }
+fn find_insert_index<T>(v: &Vec<HashEntry<T>>, cap: usize, key: &String, hash: u64) -> Option<usize> {
+  // Returns index at which to insert key into v
+  let ideal_idx = hash as usize % cap;
+  for off in 0..cap {
+    let i = (ideal_idx + off) % cap;
+
+    match v[i] {
+      HashEntry::Empty => {return Some(i)},
+      HashEntry::Tombstone {index: target_index} => {
+        // This is a deleted element that belonged on the same probe as the
+        // one we're trying to insert
+        if ideal_idx == target_index {
+          return Some(i);
         }
-      };
-    }
-    return None;
+      },
+      HashEntry::Value {key: ref target_key, hash: target_hash, ..} => {
+        if hash == target_hash && *key == *target_key {
+          return Some(i);
+        }
+      }
+    };
   }
+  return None;
 }
 
 fn hash_func(key: &String) -> u64 {
@@ -147,6 +185,22 @@ mod tests {
 
     assert_eq!(hash.get(String::from("bar")), None);
   }
+
+  #[test]
+  fn test_grow_hash() {
+    let mut hash = Hash::new(2);
+
+    for k in 1..10 {
+      let key = k.to_string();
+      hash.set(key, k);
+    }
+
+    for k in 1..10 {
+      let key = k.to_string();
+      assert_eq!(hash.get(key), Some(&k));
+    }
+  }
+
 
   #[test]
   fn test_override() {

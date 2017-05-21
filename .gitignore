@@ -8,6 +8,9 @@ target/
 # Sublime
 *.sublime-workspace
 
+# Vim
+rusty-tags.vi
+
 # Misc
 *.log
 .vagrant/

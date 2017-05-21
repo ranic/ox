@@ -41,6 +41,7 @@ fn handle_client(hash_table: &mut hash::vec::Hash<Vec<u8>>, stream: TcpStream) {
     },
     parser::Cmd::Unknown {message} => {
       // TODO write back error
+      println!("unknown: {}", message);
     },
   };
 }
