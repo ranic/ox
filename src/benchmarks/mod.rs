@@ -15,17 +15,34 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-#![feature(test)]
-
 extern crate test;
+
 
 #[cfg(test)]
 mod tests {
+  use hash::vec;
+  use std::collections::HashMap;
+  use super::test::Bencher;
   #[bench]
-  fn bench_add_two(b: &mut Bencher) {
-      b.iter(|| {
-        add_two(2)
-      });
+  fn mine(b: &mut Bencher) {
+    b.iter(|| {
+      let mut hash = vec::Hash::new(1024 * 1024);
+      for i in 0..1024 {
+        let k: String = format!("k{}", i);
+        let v: String = format!("v{}", i);
+        hash.set(k, v);
+      }
+    });
+  }
+  #[bench]
+  fn rust(b: &mut Bencher) {
+    b.iter(|| {
+      let mut hash = HashMap::new();
+      for i in 0..1024 {
+        let k: String = format!("k{}", i);
+        let v: String = format!("v{}", i);
+        hash.insert(k, v);
+      }
+    });
   }
 }

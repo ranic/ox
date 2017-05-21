@@ -15,12 +15,14 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#![feature(test)]
 
 extern crate ini;
 mod hash;
 mod parser;
 mod util;
 mod consts;
+mod benchmarks;
 
 use std::net::{TcpListener, TcpStream};
 use std::env;
