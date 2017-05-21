@@ -19,10 +19,8 @@
 use hash::functions;
 
 enum HashEntry<T> {
-  // TODO: Rename index -> ideal_idx. It should be the start of the probe, not where the element
-  // ended up
-  Value {key: String, data: T, hash: u64, index: usize},
-  Tombstone {index: usize},
+  Value {key: String, data: T, hash: u64, ideal_index: usize},
+  Tombstone {ideal_index: usize},
   Empty,
 }
 
@@ -42,9 +40,9 @@ impl <T> Hash<T> {
 
   pub fn get(&self, key: String) -> Option<&T> {
     let hash = hash_func(&key);
-    let initial_i = self.hash_to_index(hash);
+    let start_index = self.hash_to_index(hash);
     for offset in 0..self.capacity {
-      let i = (initial_i + offset) % self.capacity;
+      let i = (start_index + offset) % self.capacity;
       match self.table[i] {
         HashEntry::Empty => {return None;}
         HashEntry::Tombstone {..} => (),
@@ -72,7 +70,7 @@ impl <T> Hash<T> {
       match entry {
         HashEntry::Value {key: target_key, data, hash, ..} => {
           match find_insert_index(&new_table, new_cap, &key, hash) {
-            Some(i) => {new_table[i] = HashEntry::Value {key: target_key, data, hash, index: i};}
+            Some((i, ideal_index)) => {new_table[i] = HashEntry::Value {key: target_key, data, hash, ideal_index};}
             None => {panic!("Failed to insert during resize! old_cap: {}, new_cap: {}", self.capacity, new_cap);}
           }
         },
@@ -83,7 +81,7 @@ impl <T> Hash<T> {
     // Add the supplied (key, value) to new table
     let hash = hash_func(&key);
     match find_insert_index(&new_table, new_cap, &key, hash) {
-      Some(i) => {new_table[i] = HashEntry::Value {key: key, data: value, hash, index: i};},
+      Some((i, ideal_index)) => {new_table[i] = HashEntry::Value {key: key, data: value, hash, ideal_index};},
       None => {panic!("Failed to insert during resize! old_cap: {}, new_cap: {}", self.capacity, new_cap);}
     }
     self.capacity = new_cap;
@@ -93,16 +91,15 @@ impl <T> Hash<T> {
   pub fn set(&mut self, key: String, value: T) {
     let hash = hash_func(&key);
     match find_insert_index(&self.table, self.capacity, &key, hash) {
-      Some(i) => {self.table[i] = HashEntry::Value {key, data: value, hash, index: i}; return;}
+      Some((i, ideal_index)) => {self.table[i] = HashEntry::Value {key, data: value, hash, ideal_index}; return;}
       None => {self.grow(key, value);}
     }
   }
 
   pub fn del(&mut self, key: String) {
     let hash = hash_func(&key);
-    let initial_i = self.hash_to_index(hash);
-    match self.find_del_index(&key, initial_i) {
-      Some((index, initial_index)) => {self.table[index] = HashEntry::Tombstone {index: initial_index};},
+    match find_del_index(&self.table, self.capacity, &key, hash) {
+      Some((index, ideal_index)) => {self.table[index] = HashEntry::Tombstone {ideal_index};},
       None => (),
     }
   }
@@ -110,44 +107,45 @@ impl <T> Hash<T> {
   fn hash_to_index(&self, hash: u64) -> usize{
     return (hash % self.capacity as u64) as usize;
   }
-
-  fn find_del_index(&mut self, key: &String, initial_i: usize) -> Option<(usize, usize)> {
-    for offset in 0..self.capacity {
-      let i = (initial_i + offset) % self.capacity;
-
-      match self.table[i] {
-        HashEntry::Value {key: ref target_key, index, ..} => {
-          if *key == *target_key {
-            return Some((i, index));
-          }
-        },
-        HashEntry::Empty => {break;},
-        _ => (),
-      };
-    }
-    return None;
-  }
-
 }
 
-fn find_insert_index<T>(v: &Vec<HashEntry<T>>, cap: usize, key: &String, hash: u64) -> Option<usize> {
-  // Returns index at which to insert key into v
-  let ideal_idx = hash as usize % cap;
+fn find_del_index<T>(v: &Vec<HashEntry<T>>, cap: usize, key: &String, hash: u64) -> Option<(usize, usize)> {
+  // Return (index_to_delete, ideal_index)
+  let ideal_index = hash as usize % cap;
   for off in 0..cap {
-    let i = (ideal_idx + off) % cap;
+    let i = (ideal_index + off) % cap;
 
     match v[i] {
-      HashEntry::Empty => {return Some(i)},
-      HashEntry::Tombstone {index: target_index} => {
+      HashEntry::Value {key: ref target_key, ideal_index, hash: target_hash, ..} => {
+        if hash == target_hash && *key == *target_key {
+          return Some((i, ideal_index));
+        }
+      },
+      HashEntry::Empty => {break;},
+      _ => (),
+    };
+  }
+  return None;
+}
+
+fn find_insert_index<T>(v: &Vec<HashEntry<T>>, cap: usize, key: &String, hash: u64) -> Option<(usize, usize)> {
+  // Returns (index, ideal_index) to insert key
+  let ideal_index = hash as usize % cap;
+  for off in 0..cap {
+    let i = (ideal_index + off) % cap;
+
+    match v[i] {
+      HashEntry::Empty => {return Some((i, ideal_index))},
+      HashEntry::Tombstone {ideal_index: target_index} => {
         // This is a deleted element that belonged on the same probe as the
         // one we're trying to insert
-        if ideal_idx == target_index {
-          return Some(i);
+        if ideal_index == target_index {
+          return Some((i, ideal_index));
         }
       },
       HashEntry::Value {key: ref target_key, hash: target_hash, ..} => {
         if hash == target_hash && *key == *target_key {
-          return Some(i);
+          return Some((i, ideal_index));
         }
       }
     };
@@ -232,6 +230,27 @@ mod tests {
 
     assert_eq!(hash.get(String::from("foo")), None);
     assert_eq!(hash.get(String::from("baz")), Some(&String::from("bar")));
+  }
+
+  #[test]
+  fn test_set_after_filled_with_tombstones() {
+    let cap = 10;
+    let mut hash = Hash::new(cap);
+
+    for k in 0..cap {
+      let key = k.to_string();
+      hash.set(key, k);
+    }
+
+    // Delete everything
+    for k in 0..cap {
+      let key = k.to_string();
+      hash.del(key);
+    }
+
+    // Set a new value (this should force a resize to purge tombstones)
+    hash.set(cap.to_string(), cap);
+    assert_eq!(hash.get(cap.to_string()), Some(&cap));
   }
 
   #[test]
