@@ -1,5 +1,5 @@
 /*
-  <file_name>
+  Source: <file_name>
   Copyright (C) <year> <author>
 
   This program is free software: you can redistribute it and/or modify

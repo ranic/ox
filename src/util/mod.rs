@@ -1,5 +1,5 @@
 /*
-  Source: hash/mod.rs
+  Source: util/mod.rs
   Copyright (C) 2017 Akshay Nanavati <https://github.com/akshaynanavati>
 
   This program is free software: you can redistribute it and/or modify
@@ -16,5 +16,11 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-pub mod functions;
-pub mod vec;
+pub fn find_space(arr: &[u8], len: usize) -> Option<usize> {
+  for i in 0..len {
+    if arr[i] == ' ' as u8 {
+      return Some(i);
+    }
+  }
+  return None;
+}

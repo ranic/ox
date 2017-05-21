@@ -1,5 +1,5 @@
 /*
-  Source: hash/mod.rs
+  Source: const.rs
   Copyright (C) 2017 Akshay Nanavati <https://github.com/akshaynanavati>
 
   This program is free software: you can redistribute it and/or modify
@@ -16,5 +16,5 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-pub mod functions;
-pub mod vec;
+pub const BUF_SIZE: usize = 1024;
+pub const DEFAULT_CONFIG_FILE: &str = "config/default.ini";
