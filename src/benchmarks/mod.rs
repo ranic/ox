@@ -26,11 +26,18 @@ mod tests {
   #[bench]
   fn mine(b: &mut Bencher) {
     b.iter(|| {
-      let mut hash = vec::Hash::new(1024 * 1024);
+      let mut hash = vec::Hash::new(1024);
       for i in 0..1024 {
         let k: String = format!("k{}", i);
-        let v: String = format!("v{}", i);
-        hash.set(k, v);
+        hash.set(k, i);
+      }
+      // Prevent this from being optimized out
+      for i in 0..1024 {
+        let k: String = format!("k{}", i);
+        match hash.get(k) {
+          Some(_) => {},
+          None => ()
+        }
       }
     });
   }
@@ -40,8 +47,15 @@ mod tests {
       let mut hash = HashMap::new();
       for i in 0..1024 {
         let k: String = format!("k{}", i);
-        let v: String = format!("v{}", i);
-        hash.insert(k, v);
+        hash.insert(k, i);
+      }
+      // Prevent this from being optimized out
+      for i in 0..1024 {
+        let k: String = format!("k{}", i);
+        match hash.get(&k) {
+          Some(_) => {},
+          None => ()
+        }
       }
     });
   }
